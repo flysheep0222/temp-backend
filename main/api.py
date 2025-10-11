@@ -65,23 +65,16 @@ class SensorsView(APIView):
 
 
 class HealthView(APIView):
-    """
-    GET /api/health
-    - 默认返回所有 SensorHealth
-    - ?aggregate=true 时返回聚合统计：{"connected": N, "disconnected": M}
-    """
     def get(self, request):
         if request.query_params.get("aggregate") in ("1", "true", "True"):
-            counts = (SensorHealth.objects
-                        .values("status")
-                        .order_by()
-                        .annotate(n=models.Count("id")))
-            agg = {"connected": 0, "disconnected": 0}
-            for row in counts:
-                agg[row["status"]] = row["n"]
-            return Response({"counts": agg})
+            # 简单直接的计数法，最不容易出错
+            connected = SensorHealth.objects.filter(status="connected").count()
+            disconnected = SensorHealth.objects.filter(status="disconnected").count()
+            return Response({"counts": {"connected": connected, "disconnected": disconnected}})
+
         qs = SensorHealth.objects.select_related("sensor").order_by("sensor__sensor_id")
         return Response(SensorHealthSerializer(qs, many=True).data)
+
 
 
 class FeedbackView(APIView):
@@ -170,7 +163,6 @@ class OverviewView(APIView):
         if global_fb:
             fb_payload = FeedbackSerializer(global_fb).data
         else:
-            # 复用 FeedbackView 的“汇总计算”
             minutes = 15
             since = timezone.now() - timedelta(minutes=minutes)
             latest_per_sensor = (Feedback.objects
@@ -201,17 +193,16 @@ class OverviewView(APIView):
                     "updatedAt": timezone.now(),
                 }
 
-        data = OverviewSerializer({
+        # 这里直接拼装最终响应（全部已是“可序列化”的 dict）
+        data = {
             "map": MapAssetSerializer(asset).data if asset else None,
             "sensors": SensorSerializer(sensors, many=True).data,
             "health": SensorHealthSerializer(health, many=True).data,
-            "feedback": fb_payload
-        }).data
-
-        # 附上坐标元数据
-        data["coordinateMeta"] = {
-            "origin": "top-left",
-            "xAxis": "right",
-            "yAxis": "down"
+            "feedback": fb_payload,
+            "coordinateMeta": {
+                "origin": "top-left",
+                "xAxis": "right",
+                "yAxis": "down",
+            },
         }
         return Response(data)
