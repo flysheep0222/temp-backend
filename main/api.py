@@ -1,5 +1,5 @@
 from datetime import timedelta
-from django.db.models import Max, Sum, Q
+from django.db.models import Max, Sum, Q, Count
 from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -73,9 +73,9 @@ class HealthView(APIView):
     def get(self, request):
         if request.query_params.get("aggregate") in ("1", "true", "True"):
             counts = (SensorHealth.objects
-                      .values("status")
-                      .order_by()
-                      .annotate(n=models.Count("id")))
+                        .values("status")
+                        .order_by()
+                        .annotate(n=models.Count("id")))
             agg = {"connected": 0, "disconnected": 0}
             for row in counts:
                 agg[row["status"]] = row["n"]
