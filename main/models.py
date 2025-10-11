@@ -1,8 +1,11 @@
+from __future__ import annotations
+
+
 from django.db import models
 
 # Create your models here.
 # app: main  ->  main/models.py
-from __future__ import annotations
+
 from datetime import timedelta
 from django.utils import timezone
 
