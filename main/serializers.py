@@ -21,6 +21,11 @@ class SensorSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data.setdefault("last_seen_at", timezone.now())
         return Sensor.objects.create(**validated_data)
+    
+    def update(self, instance, validated_data):
+        # 不允许通过更新接口更改 sensorId
+        validated_data.pop("sensor_id", None)
+        return super().update(instance, validated_data)
 
 
 class SensorHealthSerializer(serializers.ModelSerializer):

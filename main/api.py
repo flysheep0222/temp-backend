@@ -50,6 +50,12 @@ class SensorsView(APIView):
     GET /api/sensors
     - 返回全部传感器（可按 ?updatedWithin=minutes 过滤）
     """
+    def get_object(self, sensor_id: str) -> Sensor:
+        try:
+            return Sensor.objects.get(sensor_id=sensor_id)
+        except Sensor.DoesNotExist:
+            raise Http404
+
     def get(self, request):
         qs = Sensor.objects.all().order_by("sensor_id")
         minutes = request.query_params.get("updatedWithin")
@@ -63,33 +69,30 @@ class SensorsView(APIView):
                                 status=status.HTTP_400_BAD_REQUEST)
         return Response(SensorSerializer(qs, many=True).data)
     
-    def post(self, request):
+    def put(self, request, sensor_id: str):
         """
-        POST /api/sensors
-        Body:
-        {
-          "sensorId": "S-001",
-          "x": 0.32,
-          "y": 0.58,
-          "temperatureC": 24.3,
-          "batteryPct": 86,           # 可选
-          "lastSeenAt": "2025-10-09T03:20:15Z"  # 可选，不传则用当前时间
-        }
+            PUT /api/sensors/<sensor_id>
+            - 更新指定传感器字段
+            Body 示例:
+            {
+            "x": 0.4,
+            "y": 0.6,
+            "temperatureC": 26.8,
+            "batteryPct": 90
+            }
         """
-        serializer = SensorSerializer(data=request.data)
+        sensor = self.get_object(sensor_id)
+        serializer = SensorSerializer(sensor, data=request.data, partial=True)
         if not serializer.is_valid():
             return Response(
                 {"error": {"code": "BAD_REQUEST", "message": serializer.errors}},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        try:
-            obj = serializer.save()
-        except IntegrityError:
-            return Response(
-                {"error": {"code": "CONFLICT", "message": "sensorId already exists"}},
-                status=status.HTTP_409_CONFLICT,
-            )
-        return Response(SensorSerializer(obj).data, status=status.HTTP_201_CREATED)
+
+        obj = serializer.save()
+        return Response(SensorSerializer(obj).data, status=status.HTTP_200_OK)
+
+
 
 
 class HealthView(APIView):
