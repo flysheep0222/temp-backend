@@ -57,6 +57,12 @@ MIDDLEWARE = [
 
 CORS_ALLOW_ALL_ORIGINS = True
 
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "x-csrftoken",
+    "authorization",
+    "content-type",
+]
+
 ROOT_URLCONF = 'temp_backend.urls'
 
 TEMPLATES = [
