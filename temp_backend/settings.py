@@ -39,9 +39,13 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'main',
     'rest_framework',
+    "corsheaders",
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",   # 放在最前面，至少在 CommonMiddleware 之前
+    "django.middleware.security.SecurityMiddleware",
+    "django.middleware.common.CommonMiddleware",
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -50,6 +54,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = 'temp_backend.urls'
 
@@ -130,3 +136,4 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "main.api.exception_handler",  # 自定义错误格式
     "DATETIME_FORMAT": "%Y-%m-%dT%H:%M:%SZ",            # 统一 ISO8601 Z
 }
+
