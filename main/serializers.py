@@ -1,16 +1,26 @@
 from rest_framework import serializers
 from .models import Sensor, SensorHealth, Feedback, MapAsset
-
+from django.utils import timezone
 
 class SensorSerializer(serializers.ModelSerializer):
     sensorId = serializers.CharField(source="sensor_id")
     temperatureC = serializers.FloatField(source="temperature_c")
     batteryPct = serializers.IntegerField(source="battery_pct", required=False, allow_null=True)
-    lastSeenAt = serializers.DateTimeField(source="last_seen_at")
+    lastSeenAt = serializers.DateTimeField(source="last_seen_at", required=False)  # 可选
 
     class Meta:
         model = Sensor
         fields = ("sensorId", "x", "y", "temperatureC", "batteryPct", "lastSeenAt")
+        extra_kwargs = {
+            "sensorId": {"required": True},
+            "x": {"required": True},
+            "y": {"required": True},
+            "temperatureC": {"required": True},
+        }
+
+    def create(self, validated_data):
+        validated_data.setdefault("last_seen_at", timezone.now())
+        return Sensor.objects.create(**validated_data)
 
 
 class SensorHealthSerializer(serializers.ModelSerializer):

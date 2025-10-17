@@ -62,6 +62,34 @@ class SensorsView(APIView):
                 return Response({"error": {"code": "BAD_REQUEST", "message": "updatedWithin must be integer minutes"}},
                                 status=status.HTTP_400_BAD_REQUEST)
         return Response(SensorSerializer(qs, many=True).data)
+    
+    def post(self, request):
+        """
+        POST /api/sensors
+        Body:
+        {
+          "sensorId": "S-001",
+          "x": 0.32,
+          "y": 0.58,
+          "temperatureC": 24.3,
+          "batteryPct": 86,           # 可选
+          "lastSeenAt": "2025-10-09T03:20:15Z"  # 可选，不传则用当前时间
+        }
+        """
+        serializer = SensorSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"error": {"code": "BAD_REQUEST", "message": serializer.errors}},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            obj = serializer.save()
+        except IntegrityError:
+            return Response(
+                {"error": {"code": "CONFLICT", "message": "sensorId already exists"}},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return Response(SensorSerializer(obj).data, status=status.HTTP_201_CREATED)
 
 
 class HealthView(APIView):
