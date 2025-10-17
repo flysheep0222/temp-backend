@@ -110,65 +110,27 @@ class HealthView(APIView):
 
 class FeedbackView(APIView):
     """
-    GET /api/feedback
-    - 优先返回“全局聚合”的最新一条（sensor is NULL）
-    - 若没有，则对“最近窗口”内的各传感器最新记录求和
-    - 支持 ?window=15（分钟）
+    GET  /api/feedback          -> 返回全部 feedback 列表（仅 sensorId/hotCount/coldCount）
+    PUT  /api/feedback/<pk>     -> 更新指定 feedback 的上述字段（允许部分字段）
     """
-    def get(self, request):
-        # 先找全局聚合
-        global_fb = (Feedback.objects
-                     .filter(sensor__isnull=True)
-                     .order_by("-updated_at", "-id")
-                     .first())
-        if global_fb:
-            return Response(FeedbackSerializer(global_fb).data)
 
-        # 没有全局记录 → 汇总计算
-        minutes = request.query_params.get("window", 15)
+    def get_object(self, pk: int) -> Feedback:
         try:
-            minutes = int(minutes)
-        except ValueError:
-            return Response({"error": {"code": "BAD_REQUEST", "message": "window must be integer minutes"}},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Feedback.objects.select_related("sensor").get(pk=pk)
+        except Feedback.DoesNotExist:
+            raise Http404
 
-        since = timezone.now() - timedelta(minutes=minutes)
+    def get(self, request):
+        qs = Feedback.objects.select_related("sensor").order_by("id")
+        return Response(FeedbackSerializer(qs, many=True).data, status=status.HTTP_200_OK)
 
-        # 取每个传感器在窗口内的“最新一条”并累加
-        # 方案：先找每个传感器的最新时间，再二次过滤求和
-        latest_per_sensor = (Feedback.objects
-                             .filter(sensor__isnull=False, updated_at__gte=since)
-                             .values("sensor_id")
-                             .annotate(latest=Max("updated_at")))
-
-        if not latest_per_sensor:
-            # 空集也返回结构化数据
-            payload = {
-                "sensorId": None,
-                "coldCount": 0,
-                "hotCount": 0,
-                "window": {"minutes": minutes},
-                "updatedAt": timezone.now(),
-            }
-            return Response(payload)
-
-        q_objects = Q()
-        for row in latest_per_sensor:
-            q_objects |= Q(sensor_id=row["sensor_id"], updated_at=row["latest"])
-
-        selected = Feedback.objects.filter(q_objects)
-        cold = selected.aggregate(s=Sum("cold_count"))["s"] or 0
-        hot = selected.aggregate(s=Sum("hot_count"))["s"] or 0
-        latest = selected.aggregate(m=Max("updated_at"))["m"] or timezone.now()
-
-        payload = {
-            "sensorId": None,
-            "coldCount": cold,
-            "hotCount": hot,
-            "window": {"minutes": minutes},
-            "updatedAt": latest,
-        }
-        return Response(payload)
+    def put(self, request, pk: int):
+        obj = self.get_object(pk)
+        ser = FeedbackSerializer(obj, data=request.data, partial=True)  # 按你的习惯，PUT 也允许部分更新
+        if not ser.is_valid():
+            return Response({"error": {"code": "BAD_REQUEST", "message": ser.errors}}, status=status.HTTP_400_BAD_REQUEST)
+        obj = ser.save()
+        return Response(FeedbackSerializer(obj).data, status=status.HTTP_200_OK)
 
 
 class OverviewView(APIView):

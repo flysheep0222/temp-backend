@@ -43,20 +43,32 @@ class _WindowSerializer(serializers.Serializer):
 
 
 class FeedbackSerializer(serializers.ModelSerializer):
-    sensorId = serializers.CharField(source="sensor.sensor_id", required=False, allow_null=True)
-    coldCount = serializers.IntegerField(source="cold_count")
-    hotCount = serializers.IntegerField(source="hot_count")
-    # 将 DurationField 转为 { "minutes": N }
-    window = serializers.SerializerMethodField()
-    updatedAt = serializers.DateTimeField(source="updated_at")
+    sensorId  = serializers.CharField(source="sensor.sensor_id", required=False)
+    hotCount  = serializers.IntegerField(source="hot_count",  required=False, min_value=0)
+    coldCount = serializers.IntegerField(source="cold_count", required=False, min_value=0)
 
     class Meta:
-        model = Feedback
-        fields = ("sensorId", "coldCount", "hotCount", "window", "updatedAt")
+        model  = Feedback
+        fields = ("sensorId", "hotCount", "coldCount")
 
-    def get_window(self, obj):
-        minutes = int(obj.window.total_seconds() // 60) if obj.window else 15
-        return {"minutes": minutes}
+    def update(self, instance, validated_data):
+        # 处理 sensorId（可选）
+        sensor_data = validated_data.pop("sensor", None)  # 来自 source="sensor.sensor_id"
+        if sensor_data and "sensor_id" in sensor_data:
+            sid = sensor_data["sensor_id"]
+            try:
+                instance.sensor = Sensor.objects.get(sensor_id=sid)
+            except Sensor.DoesNotExist:
+                raise serializers.ValidationError({"sensorId": "Sensor not found."})
+
+        # 处理计数
+        if "hot_count" in validated_data:
+            instance.hot_count = validated_data["hot_count"]
+        if "cold_count" in validated_data:
+            instance.cold_count = validated_data["cold_count"]
+
+        instance.save()
+        return instance
 
 
 class MapAssetSerializer(serializers.ModelSerializer):
